@@ -1,6 +1,6 @@
 # Simple ChatPDF
 
-a simple tool that i used a lot.
+a simple tool that i use a lot.
 
 ![image](https://github.com/user-attachments/assets/09583337-40ae-40b3-96c5-bff84c16237a)
 
