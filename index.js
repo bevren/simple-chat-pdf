@@ -1405,6 +1405,7 @@
         else {
             if (role === "assistant") {
                 cContent.innerHTML = marked.parse(message);
+                preTagStyling(cContent);
             }
             else {
                 cContent.innerText += message;
