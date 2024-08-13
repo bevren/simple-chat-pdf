@@ -188,10 +188,11 @@
                                             <span>Provider</span>
                                             <select id="embedProvider">
                                                 <option>OpenAI</option>
+                                                <option>Ollama</option>
                                             </select>
                                         </div>
 
-                                        <div>
+                                        <div id = "embedModelSelectContainer">
                                             <span>Model</span>
                                             <select id="embedModel">
                                                 <option>text-embedding-3-large</option>
@@ -202,21 +203,17 @@
 
                                     </div>
 
-                                    <div id="customEmbedProviderContainer" style="display: none; flex-direction:row; gap:1rem;">
+                                    <div id="customEmbedProviderContainer" style="display: none; flex-direction:column;">
                                         
-                                        <div style="flex-grow:1;">
-                                            <span>Host</span>
-                                            <input id="embedHost" type="text" name="" placeholder="Host" />
-                                        </div>
-                                        
-                                        <div>
-                                            <span>Port</span>
-                                            <input id="embedPort" type="text" name="" placeholder="Port" />
-                                        </div>
+                                        <span>Host</span>
+                                        <input style="margin-bottom: 1rem;" id="embedHost" autocomplete="off" spellcheck="false" type="text" name="" placeholder="localhost:11434" />
+
+                                        <span>Model</span>
+                                        <input id="embedModelInput" autocomplete="off" spellcheck="false" type="text" name="" placeholder="nomic-text-embed" />
                                         
                                     </div>
 
-                                    <div>
+                                    <div id="embedApiKeyContainer">
                                         <span>Api Key</span>
                                         <input id="embedApiKey" autocomplete="off" spellcheck="false" type="text" name="" placeholder="API KEY" />
                                     </div>

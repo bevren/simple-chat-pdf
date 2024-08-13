@@ -52,8 +52,8 @@
     const embedModelSelect = document.getElementById("embedModel");
     const customEmbedProviderContainer = document.getElementById("customEmbedProviderContainer");
     const embedHostInput = document.getElementById("embedHost");
-    const embedPortInput = document.getElementById("embedPort");
     const embedApiKey = document.getElementById("embedApiKey");
+    const embedModelInput = document.getElementById("embedModelInput");
     const pdfTitle = document.getElementById("pdfTitle");
     const zoomInButton = document.getElementById("zoomIn");
     const zoomOutButton = document.getElementById("zoomOut");
@@ -178,8 +178,8 @@
                         "openai": "",
                         "groq": ""
                     },
-                    "host": "localhost",
-                    "port": "11434"
+                    "host": "http://localhost:11434",
+                    "ollamaModel": ""
                 },
                 "embeddings": {
                     "provider": "OpenAI",
@@ -187,8 +187,8 @@
                     "apiKey": {
                         "openai": ""
                     },
-                    "host": "localhost",
-                    "port": "11434"
+                    "host": "http://localhost:11434",
+                    "ollamaModel": ""
                 }
             };
             localStorage.setItem("app", JSON.stringify(t));
@@ -222,20 +222,24 @@
             chatModelSelect.value = modelName;
         }
         chatHostInput.value = app["chat"]["host"];
-        chatPortInput.value = app["chat"]["port"];
         chatApiKey.value = app["chat"]["apiKey"][app["chat"]["provider"].toLowerCase()];
         embedProviderSelect.value = app["embeddings"]["provider"];
+        const embedModelSelectContainer = document.getElementById("embedModelSelectContainer");
+        const embedApiKeyContainer = document.getElementById("embedApiKeyContainer");
         if (embedProviderSelect.value === "Ollama") {
             customEmbedProviderContainer.style.display = "flex";
+            embedModelSelectContainer.hide();
+            embedApiKeyContainer.hide();
+            embedModelInput.value = app["embeddings"]["ollamaModel"];
+            embedHostInput.value = app["embeddings"]["host"];
         }
         else {
+            embedApiKey.value = app["embeddings"]["apiKey"][app["embeddings"]["provider"].toLowerCase()];
             customEmbedProviderContainer.hide();
+            embedModelSelect.value = app["embeddings"]["model"];
+            embedModelSelectContainer.show();
+            embedApiKeyContainer.show();
         }
-        console.log(app["embeddings"]["model"]);
-        embedModelSelect.value = app["embeddings"]["model"];
-        embedHostInput.value = app["embeddings"]["host"];
-        embedPortInput.value = app["embeddings"]["port"];
-        embedApiKey.value = app["embeddings"]["apiKey"][app["embeddings"]["provider"].toLowerCase()];
     }
     function getTextWidth(text, textarea) {
         const span = document.createElement('span');
@@ -495,13 +499,14 @@
                 result = e.target.result;
             }
             else {
+                const model = app["embeddings"]["provider"].toLowerCase() === "openai" ? app["embeddings"]["model"] : app["embeddings"]["ollamaModel"];
                 result = {
                     "id": path,
                     "name": fileName,
                     "url": openedUrlLink,
                     "messages": [],
                     "embeddings": [],
-                    "embeddingModel": app["embeddings"]["model"]
+                    "embeddingModel": model
                 };
                 convos.add(result);
             }
@@ -683,11 +688,21 @@
     });
     embedProviderSelect.addEventListener("change", (e) => {
         const val = e.target.value;
+        const embedModelSelectContainer = document.getElementById("embedModelSelectContainer");
+        const embedApiKeyContainer = document.getElementById("embedApiKeyContainer");
         if (val === "Ollama") {
             customEmbedProviderContainer.style.display = "flex";
+            embedModelSelectContainer.hide();
+            embedApiKeyContainer.hide();
+            embedModelInput.value = app["embeddings"]["ollamaModel"];
+            embedHostInput.value = app["embeddings"]["host"];
         }
         else {
             customEmbedProviderContainer.hide();
+            embedModelSelectContainer.show();
+            embedApiKeyContainer.show();
+            embedApiKey.value = app["embeddings"]["apiKey"][val.toLowerCase()];
+            embedModelSelect.value = app["embeddings"]["model"];
         }
         setStateApp("embeddings", "provider", val);
     });
@@ -703,9 +718,9 @@
         const val = e.target.value;
         setStateApp("embeddings", "host", val);
     });
-    embedPortInput.addEventListener("input", (e) => {
+    embedModelInput.addEventListener("input", (e) => {
         const val = e.target.value;
-        setStateApp("embeddings", "port", val);
+        setStateApp("embeddings", "ollamaModel", val);
     });
     pdfDownloadButton.addEventListener("click", (e) => {
         if (!pdfDocument)
@@ -1059,7 +1074,9 @@
         convos.get(path).onsuccess = async (e) => {
             if (e.target.result !== undefined) {
                 const test = e.target.result;
-                let embeddingsExists = test.embeddings.length > 0;
+                const model = app["embeddings"]["provider"].toLowerCase() === "openai" ? app["embeddings"]["model"] : app["embeddings"]["ollamaModel"];
+                let embeddingsExists = test.embeddings.length > 0 && test.embeddingModel === model;
+                console.log(model, embeddingsExists);
                 if (!embeddingsExists) {
                     await getEmbeddings();
                     if (currentEmbeddings.length > 0) {
@@ -1080,7 +1097,7 @@
                 pdfjsViewer.currentScaleValue = "auto";
                 pdfSinglePageViewer.currentScaleValue = 1.0;
                 scaleSelector.value = `100%`;
-                document.getElementById("modelName").innerText = app["chat"]["model"];
+                document.getElementById("modelName").innerText = ` ${app["chat"]["model"]}`;
                 pageSelector.value = currentPageNumber;
                 loadingPage.hide();
                 pdfControls.show();
@@ -1103,7 +1120,7 @@
             endPoint = "https://api.groq.com/openai/v1/chat/completions";
         }
         else if (provider === "Ollama") {
-            endPoint = `http://${app["chat"]["host"]}:${app["chat"]["port"]}/v1/chat/completions`;
+            endPoint = `http://${app["chat"]["host"]}/v1/chat/completions`;
             apiKey = "ollama";
         }
         const xhr = new XMLHttpRequest();
@@ -1131,6 +1148,7 @@
             if (currentEmbeddings.length > 0) {
                 if (currentEmbeddings[0].embedding.length === emb.length) {
                     topK = sortBySimilarity(emb, currentEmbeddings, 3);
+                    console.log(topK);
                 }
                 else {
                     console.log("dimensions do not match, ", currentEmbeddings[0].embedding.length, emb.length);
@@ -1485,25 +1503,57 @@
         })
             .sort((a, b) => b.similarity - a.similarity).slice(0, topK);
     }
-    async function getEmbedding(message) {
-        const apiKey = app["embeddings"]["apiKey"]["openai"];
-        const model = currentEmbeddingModel;
-        if (model != app["embeddings"]["model"]) {
-            console.log(app["embeddings"]["model"], "but the conversation created using ", model, "switching to", model);
+    function getValidUrl(url) {
+        const pattern = /^((http|https|ftp):\/\/)/;
+        let result = url;
+        if (!pattern.test(result)) {
+            result = "http://" + result;
         }
-        if (!apiKey || !model) {
-            console.error("set fields");
-            return;
+        if (result[result.length - 1] !== '/') {
+            result += '/';
+        }
+        return result;
+    }
+    async function getEmbedding(message) {
+        const provider = app["embeddings"]["provider"];
+        const apiKey = app["embeddings"]["apiKey"]["openai"];
+        let model = currentEmbeddingModel;
+        const host = app["embeddings"]["host"];
+        if (provider.toLowerCase() === "ollama") {
+            model = app["embeddings"]["ollamaModel"];
+            if (!host || !model) {
+                console.error("set fields");
+                return;
+            }
+        }
+        else {
+            if (!apiKey || !model) {
+                console.error("set fields");
+                return;
+            }
         }
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", "https://api.openai.com/v1/embeddings", true);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
+            if (provider.toLowerCase() === "openai") {
+                xhr.open("POST", "https://api.openai.com/v1/embeddings", true);
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
+            }
+            else if (provider.toLowerCase() === "ollama") {
+                const hostUrl = getValidUrl(app["embeddings"]["host"]);
+                console.log(hostUrl);
+                xhr.open("POST", hostUrl + "api/embeddings", true);
+                xhr.setRequestHeader("Content-Type", "application/json");
+            }
             xhr.onload = (e) => {
                 try {
                     const data = JSON.parse(xhr.responseText);
-                    resolve(data.data[0].embedding);
+                    if (provider.toLowerCase() === "ollama") {
+                        resolve(data.embedding);
+                    }
+                    else if (provider.toLowerCase() === "openai") {
+                        resolve(data.data[0].embedding);
+                    }
                 }
                 catch (e) {
                     console.error(e);
@@ -1524,20 +1574,39 @@
             xhr.onerror = (event) => {
                 reject(`Error processing embedding creation (XHR readyState ${xhr.readyState}, status ${xhr.status}).`);
             };
-            xhr.send(JSON.stringify({
-                "model": model,
-                "input": message,
-            }));
+            if (provider.toLowerCase() === "openai") {
+                xhr.send(JSON.stringify({
+                    "model": model,
+                    "input": message,
+                }));
+            }
+            else if (provider.toLowerCase() === "ollama") {
+                xhr.send(JSON.stringify({
+                    "model": model,
+                    "prompt": message,
+                }));
+            }
         });
     }
     async function getEmbeddings() {
         const BATCH_SIZE = 512;
-        const OVERLAP_SIZE = 100;
+        const OVERLAP_SIZE = 70;
+        const provider = app["embeddings"]["provider"];
         const apiKey = app["embeddings"]["apiKey"]["openai"];
-        const model = app["embeddings"]["model"];
-        if (!apiKey || !model) {
-            console.error("set fields");
-            return;
+        let model = app["embeddings"]["model"];
+        const host = app["embeddings"]["host"];
+        if (provider.toLowerCase() === "ollama") {
+            model = app["embeddings"]["ollamaModel"];
+            if (!host || !model) {
+                console.error("set fields");
+                return;
+            }
+        }
+        else {
+            if (!apiKey || !model) {
+                console.error("set fields");
+                return;
+            }
         }
         const pdfText = await getAllTextFromPDF();
         const lengthOfText = pdfText.length;
@@ -1546,10 +1615,17 @@
         for (let i = 0; i < pdfText.length; i += BATCH_SIZE) {
             const promis = new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.open("POST", "https://api.openai.com/v1/embeddings", true);
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
-                let last_response_len = 0;
+                if (provider.toLowerCase() === "openai") {
+                    xhr.open("POST", "https://api.openai.com/v1/embeddings", true);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                    xhr.setRequestHeader("Authorization", `Bearer ${apiKey}`);
+                }
+                else if (provider.toLowerCase() === "ollama") {
+                    const hostUrl = getValidUrl(app["embeddings"]["host"]);
+                    console.log(hostUrl);
+                    xhr.open("POST", hostUrl + "api/embeddings", true);
+                    xhr.setRequestHeader("Content-Type", "application/json");
+                }
                 let overlappedX = i;
                 let overlappedY = BATCH_SIZE;
                 if (i > OVERLAP_SIZE) {
@@ -1562,13 +1638,18 @@
                 xhr.onload = (e) => {
                     try {
                         const data = JSON.parse(xhr.responseText);
-                        resolve({
-                            "embedding": data.data[0].embedding,
-                            "text": currentText
-                        });
+                        if (data.error) {
+                            reject({ "error": data.error });
+                        }
+                        else {
+                            const emb = provider.toLowerCase() === "ollama" ? data.embedding : data.data[0].embedding;
+                            resolve({
+                                "embedding": emb,
+                                "text": currentText
+                            });
+                        }
                     }
                     catch (e) {
-                        console.error(e);
                         reject(e);
                     }
                 };
@@ -1586,10 +1667,18 @@
                 xhr.onerror = (event) => {
                     reject(`Error processing embedding creation (XHR readyState ${xhr.readyState}, status ${xhr.status}).`);
                 };
-                xhr.send(JSON.stringify({
-                    "model": model,
-                    "input": currentText
-                }));
+                if (provider.toLowerCase() === "openai") {
+                    xhr.send(JSON.stringify({
+                        "model": model,
+                        "input": currentText,
+                    }));
+                }
+                else if (provider.toLowerCase() === "ollama") {
+                    xhr.send(JSON.stringify({
+                        "model": model,
+                        "prompt": currentText,
+                    }));
+                }
             });
             //promise end
             promises.push(promis);
@@ -1605,6 +1694,7 @@
                 if (e.target.result !== undefined) {
                     const test = e.target.result;
                     test.embeddings = allEmbeddings;
+                    test.embeddingModel = model;
                     convos.put(test);
                     console.log("successfully created embeddings");
                 }
