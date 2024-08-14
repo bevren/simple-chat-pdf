@@ -1543,7 +1543,6 @@
                 const hostUrl = getValidUrl(app["embeddings"]["host"]);
                 console.log(hostUrl);
                 xhr.open("POST", hostUrl + "api/embeddings", true);
-                xhr.setRequestHeader("Content-Type", "application/json");
             }
             xhr.onload = (e) => {
                 try {
@@ -1624,7 +1623,6 @@
                     const hostUrl = getValidUrl(app["embeddings"]["host"]);
                     console.log(hostUrl);
                     xhr.open("POST", hostUrl + "api/embeddings", true);
-                    xhr.setRequestHeader("Content-Type", "application/json");
                 }
                 let overlappedX = i;
                 let overlappedY = BATCH_SIZE;
